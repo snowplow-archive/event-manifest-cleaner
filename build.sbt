@@ -14,7 +14,7 @@
 lazy val root = project.in(file("."))
   .settings(
     name := "event-manifest-cleaner",
-    version := "0.1.0",
+    version := "0.1.0-rc1",
     scalaVersion := "2.11.11"
   )
   .settings(BuildSettings.buildSettings)
