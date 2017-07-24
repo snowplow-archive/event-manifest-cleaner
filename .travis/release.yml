@@ -1,0 +1,80 @@
+---
+# --- Variables --- #
+
+local:
+  root_dir : <%= ENV['TRAVIS_BUILD_DIR'] %>
+
+# --- Release Manager Config --- #
+
+# Required: deployment targets
+targets:
+  - type              : "awss3"
+    access_key_id     : <%= ENV['AWS_ACCESS_KEY'] %>
+    secret_access_key : <%= ENV['AWS_SECRET_KEY'] %>
+
+# Required: packages to be deployed
+packages:
+  # AWS S3 plain upload example
+  - name     : "event-manifest-cleaner" # Just for convenience
+    locations:
+    - bucket   : "snowplow-hosted-assets"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "eu-west-1"
+    - bucket   : "snowplow-hosted-assets-us-east-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "us-east-1"
+    - bucket   : "snowplow-hosted-assets-us-west-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "us-west-1"
+    - bucket   : "snowplow-hosted-assets-us-west-2"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "us-west-2"
+    - bucket   : "snowplow-hosted-assets-sa-east-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "sa-east-1"
+    - bucket   : "snowplow-hosted-assets-eu-central-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "eu-central-1"
+    - bucket   : "snowplow-hosted-assets-ap-southeast-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ap-southeast-1"
+    - bucket   : "snowplow-hosted-assets-ap-southeast-2"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ap-southeast-2"
+    - bucket   : "snowplow-hosted-assets-ap-northeast-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ap-northeast-1"
+    - bucket   : "snowplow-hosted-assets-ap-south-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ap-south-1"
+    - bucket   : "snowplow-hosted-assets-us-east-2"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "us-east-2"
+    - bucket   : "snowplow-hosted-assets-ca-central-1"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ca-central-1"
+    - bucket   : "snowplow-hosted-assets-eu-west-2"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "eu-west-2"
+    - bucket   : "snowplow-hosted-assets-ap-northeast-2"
+      path     : "4-storage/event-manifest-cleaner"
+      region   : "ap-northeast-2"
+    publish  : true
+    override : false
+    continue_on_conflict : false
+    version  : <%= FUNC['sbt_version(.)'] %>
+
+    # Required IF '--check-version' is passed: will assert that both versions are the same
+    build_version : <%= ENV['TRAVIS_TAG'] %>
+
+    # Optional: Build commands
+    build_commands:
+      - sbt assembly
+
+    # Required: Artifact. Version will be inserted between prefix and suffix
+    artifacts:
+      - type   : "asis"
+        prefix : "event-manifest-cleaner-"
+        suffix : ".jar"
+        binary_paths:
+          - "target/scala-2.11/event-manifest-cleaner-{{ packages.0.build_version }}.jar"
