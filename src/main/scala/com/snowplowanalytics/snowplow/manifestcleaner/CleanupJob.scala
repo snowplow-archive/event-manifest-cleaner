@@ -45,7 +45,7 @@ object CleanupJob {
     val skippedTotal = sc.longAccumulator("Skipped events")
 
     val events = sc.textFile(s"s3a://${jobConfig.enrichedInBucket}part-*")
-    events.map(lineToTriple).foreach { triple =>
+    events.map(lineToTriple(jobConfig.orphanEtlTime)).foreach { triple =>
       val deleted = delete(triple, storage)
       if (deleted) {
         deletedTotal.add(1)

@@ -14,6 +14,10 @@ package com.snowplowanalytics.snowplow.manifestcleaner
 
 // Scalaz
 import scalaz._
+import Scalaz._
+
+// Joda time
+import org.joda.time.DateTime
 
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
@@ -41,9 +45,10 @@ object Main {
   private[manifestcleaner] case class RawJobConf(
     enrichedInBucket: String,
     b64StorageConfig: String,
-    b64ResolverConfig: String)
+    b64ResolverConfig: String,
+    orphanEtlTime: Option[String])
 
-  private[this] val rawJobConf = RawJobConf("", "", "")
+  private[this] val rawJobConf = RawJobConf("", "", "", None)
 
   /**
     * Parsed job configuration with normalized values
@@ -51,7 +56,7 @@ object Main {
     * @param enrichedInBucket enriched archive
     * @param storageConfig parsed and validated DynamoDB
     */
-  case class JobConf(enrichedInBucket: String, storageConfig: DuplicateStorageConfig)
+  case class JobConf(enrichedInBucket: String, storageConfig: DuplicateStorageConfig, orphanEtlTime: Option[Int])
 
   private val parser = new scopt.OptionParser[RawJobConf](ProjectMetadata.name) {
     head(generated.ProjectMetadata.name, generated.ProjectMetadata.version)
@@ -67,6 +72,9 @@ object Main {
           else fail
         }
       }
+
+    opt[String]('t', "time").action((x, c) =>
+      c.copy(orphanEtlTime = Some(x))).text("Time to substitute actual etl time from enriched events (YYYY-mm-dd-HH-MM-SS)")
 
     opt[String]('c', "storage-config").required().action((x, c) =>
       c.copy(b64StorageConfig = x)).text("Base64-encoded AWS DynamoDB storage configuration JSON")
@@ -95,14 +103,17 @@ object Main {
     * Transform raw CLI options into normalized configuration double checking its values
     */
   def transform(jobConf: RawJobConf): ValidatedNel[JobConf] = jobConf match {
-    case RawJobConf(enrichedInBucket, b64StorageConfig, b64ResolverConfig) =>
+    case RawJobConf(enrichedInBucket, b64StorageConfig, b64ResolverConfig, time) =>
+      val validTime: ValidatedNel[Option[Int]] = Utils.getEtlTime(time)
       val storage = for {
         resolverConfig <- Utils.base64ToJsonNode(b64ResolverConfig).toValidationNel[ProcessingMessage, JsonNode]
         resolver <- Resolver.parse(resolverConfig)
         storageConfig <- DynamoDbConfig.extractFromBase64(b64StorageConfig, resolver)
       } yield storageConfig
 
-      storage.map((storageConfig) => JobConf(enrichedInBucket, storageConfig))
+      (storage |@| validTime) { (storageConfig, time) =>
+        JobConf(enrichedInBucket, storageConfig, time)
+      }
   }
 
   /**

@@ -33,9 +33,10 @@ import com.snowplowanalytics.iglu.client.validation.ProcessingMessageMethods._
 import org.apache.commons.codec.binary.Base64
 
 // Joda time
-import org.joda.time.DateTime
-import org.joda.time.format.DateTimeFormat
+import org.joda.time.{ DateTime, DateTimeZone }
 import org.joda.time.format.DateTimeFormatterBuilder
+import org.joda.time.format.DateTimeFormat
+
 
 /**
   * Util functions and constant that not directly related to spark job
@@ -47,6 +48,33 @@ object Utils {
   val EventIdIndex = 6
   val FingerprintIndex = 129
 
+  /**
+   * Date format in archive buckets: run=YYYY-MM-dd-HH-mm-ss
+   * In EmrEtlRunner: "%Y-%m-%d-%H-%M-%S"
+   */
+  val timeFormat = DateTimeFormat.forPattern("YYYY-MM-dd-HH-mm-ss")
+
+  /**
+   * Default format (etl_tstamp, dvce_sent_tstamp, dvce_created_tstamp)
+   * @see `com.snowplowanalytics.snowplow.enrich.hadoop.inputs.EnrichedEventLoader`
+   */
+  val RedshiftTstampFormat = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(DateTimeZone.UTC)
+
+  /**
+   * Parse run id from enriched event archive dir
+   *
+   * @param date etl timestamp timestamp
+   * @return datetime object if parsed successfully
+   */
+  def parseTime(date: String): Validated[DateTime]= {
+    try {
+      Success(DateTime.parse(date, timeFormat))
+    } catch {
+      case _: IllegalArgumentException =>
+        Failure(s"ETL Time $date has invalid format".toProcessingMessage)
+    }
+  }
+
   private val UrlSafeBase64 = new Base64(true) // true means "url safe"
 
   private lazy val Mapper = new ObjectMapper
@@ -54,22 +82,29 @@ object Utils {
   /**
     * Data extracted from EnrichedEvent and storing in DynamoDB
     */
-  case class DeduplicationTriple(eventId: String, fingerprint: String, etlTstamp: String)
+  case class DeduplicationTriple(eventId: String, fingerprint: String, etlTstamp: Int)
 
   /**
     * Split `EnrichedEvent` TSV line and extract necessary columns
     *
+    * @param etlTime optional hard-coded etl time to substitute extracted from event
     * @param line plain `EnrichedEvent` TSV
     * @return deduplication triple encapsulated into special class
     */
-  def lineToTriple(line: String): DeduplicationTriple = {
+  def lineToTriple(etlTime: Option[Int])(line: String): DeduplicationTriple = {
     val tsv = line.split('\t')
     try {
-      DeduplicationTriple(eventId = tsv(EventIdIndex), etlTstamp = tsv(EtlTimestampIndex), fingerprint = tsv(FingerprintIndex))
+      val etl = etlTime.getOrElse((DateTime.parse(tsv(EtlTimestampIndex), RedshiftTstampFormat).getMillis / 1000).toInt)
+      DeduplicationTriple(eventId = tsv(EventIdIndex), etlTstamp = etl, fingerprint = tsv(FingerprintIndex))
     } catch {
-      case e: IndexOutOfBoundsException => throw new RuntimeException(s"ERROR: Cannot split TSV [$line]\n${e.toString}")
+      case e: IndexOutOfBoundsException =>
+        throw new RuntimeException(s"ERROR: Cannot split TSV [$line]\n${e.toString}")
     }
   }
+
+  /** Transform YYYY-mm-dd-HH-MM-SS to milliseconds */
+  def getEtlTime(time: Option[String]) =
+    time.map(Utils.parseTime(_).map(t => (t.getMillis / 1000).toInt).toValidationNel).sequenceU
 
   /**
     * Converts a base64-encoded JSON string into a JsonNode

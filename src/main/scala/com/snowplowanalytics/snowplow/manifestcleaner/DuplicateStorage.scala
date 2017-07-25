@@ -16,10 +16,6 @@ package com.snowplowanalytics.snowplow.manifestcleaner
 import scalaz._
 import Scalaz._
 
-// joda-time
-import org.joda.time.{ DateTime, DateTimeZone }
-import org.joda.time.format.DateTimeFormat
-
 // Scala
 import scala.util.control.NonFatal
 import scala.collection.JavaConverters._
@@ -58,7 +54,7 @@ trait DuplicateStorage {
     *         false if condition is failed -
    *          record with these eventId and finterprint had different etlTstamp
     */
-  def delete(eventId: String, eventFingerprint: String, etlTstamp: String): Boolean
+  def delete(eventId: String, eventFingerprint: String, etlTstamp: Int): Boolean
 }
 
 
@@ -66,12 +62,6 @@ trait DuplicateStorage {
   * Companion object holding ADT for possible configurations and concrete implementations
   */
 object DuplicateStorage {
-
-  /**
-    * Default format (etl_tstamp, dvce_sent_tstamp, dvce_created_tstamp)
-    * @see `com.snowplowanalytics.snowplow.enrich.hadoop.inputs.EnrichedEventLoader`
-    */
-  val RedshiftTstampFormat = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(DateTimeZone.UTC)
 
   /**
     * ADT to hold all possible types for duplicate storage configurations
@@ -176,8 +166,7 @@ object DuplicateStorage {
   class DynamoDbStorage private[manifestcleaner](client: AmazonDynamoDB, table: String) extends DuplicateStorage {
     import DynamoDbStorage._
 
-    def delete(eventId: String, eventFingerprint: String, etlTstamp: String): Boolean = {
-      val etl: Int = (DateTime.parse(etlTstamp, RedshiftTstampFormat).getMillis / 1000).toInt
+    def delete(eventId: String, eventFingerprint: String, etl: Int): Boolean = {
       val deleteRequest = deleteRequestDummy
         .withExpressionAttributeValues(Map(":tst" -> new AttributeValue().withN(etl.toString)).asJava)
         .withKey(
