@@ -39,9 +39,9 @@ def split_full_path(path):
     ('mybucket', None)
     """
     if path.startswith('s3://'):
-        path = path.lstrip('s3://')
+        path = path[len('s3://'):]
     elif path.startswith('s3n://'):
-        path = path.lstrip('s3n://')
+        path = path[len('s3://'):]
     else:
         raise ValueError("S3 path should start with s3:// or s3n:// prefix")
     parts = path.split('/')
