@@ -41,7 +41,7 @@ def split_full_path(path):
     if path.startswith('s3://'):
         path = path[len('s3://'):]
     elif path.startswith('s3n://'):
-        path = path[len('s3://'):]
+        path = path[len('s3n://'):]
     else:
         raise ValueError("S3 path should start with s3:// or s3n:// prefix")
     parts = path.split('/')
