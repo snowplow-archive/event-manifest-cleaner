@@ -178,6 +178,7 @@ def run_emr(args):
         steps=steps,
         job_flow_role="EMR_EC2_DefaultRole",
         service_role="EMR_DefaultRole",
+        visible_to_all_users=True,
         api_params={
             'ReleaseLabel': 'emr-5.4.0',
             'Applications.member.1.Name': 'Spark',
