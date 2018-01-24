@@ -24,6 +24,8 @@ event-manifest-cleaner directory):
 $ python run.py run_emr $ENRICHED_EVENTS_DIR $STORAGE_CONFIG_PATH $IGLU_RESOLVER_PATH
 ```
 
+The user running it should have the _dynamodb:DeleteTable_ rights for the related table.
+
 Task has three required arguments: 
 
 1. Path to enriched events directory. This can be not archived directory in 
